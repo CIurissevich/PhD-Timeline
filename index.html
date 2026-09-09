@@ -1,0 +1,1392 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Visual Atlas — Timeline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Krona+One&family=Lexend:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --nero:#000000; --grigio:#6f6f6f; --bianco:#ffffff;
+    --magenta:#fe06ac; --lime:#bbd052; --navy:#073763;
+    --border:2px solid var(--nero);
+    /* cornici tenui per le tre categorie (etichette ovali dei nodi) */
+    --diritti-border:#d98fb9; --diritti-bg:#fdf1f8;
+    --movimenti-border:#93a35a; --movimenti-bg:#f6f8ec;
+    --arte-border:#5f7fa3; --arte-bg:#eef3f7;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Lexend',sans-serif; color:var(--nero); background:var(--bianco);
+    font-size:15px; line-height:1.45;
+  }
+  h1,h2,h3{font-family:'Krona One',sans-serif; font-weight:400; margin:0;}
+  a{color:inherit;}
+  button{font-family:inherit; cursor:pointer;}
+  svg{display:block;}
+  .upper{text-transform:uppercase; letter-spacing:0.06em;}
+  .visually-hidden{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap;}
+  a:focus-visible, button:focus-visible{outline:3px solid var(--magenta); outline-offset:2px;}
+  @media (prefers-reduced-motion:reduce){
+    .panel, .scrim, .pill{transition:none !important;}
+  }
+
+  /* ---------- HEADER ---------- */
+  header.topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 24px; border-bottom:var(--border);
+    flex-wrap:wrap; gap:8px;
+  }
+  .brand{font-size:13px; font-weight:600; letter-spacing:0.08em;}
+  .brand .sep{color:var(--grigio); margin:0 6px; font-weight:400;}
+  #langSwitcherTop .pill{padding:3px 10px; font-size:11px;}
+  #langSwitcherTop .pill[aria-pressed="true"]{background:var(--nero); color:var(--lime); border-color:var(--nero);}
+
+  /* ---------- FILTER / LEGEND BAR ---------- */
+  .filterbar{
+    background:var(--lime); border-bottom:var(--border);
+    display:flex; flex-direction:column; gap:10px;
+    padding:10px 20px;
+  }
+  .filterbar-row{display:flex; align-items:center; gap:18px; flex-wrap:wrap;}
+  .pills{display:flex; gap:8px; flex-wrap:wrap;}
+  .pill{
+    border:2px solid var(--nero); border-radius:999px; background:transparent;
+    padding:6px 16px; font-size:13px; font-weight:600; color:var(--nero);
+    transition:background .12s, color .12s;
+    display:inline-flex; align-items:center; gap:6px;
+  }
+  .pill svg{width:14px; height:14px; flex:none;}
+  .pill[aria-pressed="true"]{background:var(--bianco); color:var(--lime); border-color:var(--bianco);}
+  .pill:hover{background:rgba(255,255,255,.5);}
+  .legend{display:flex; gap:14px; font-size:12px; align-items:center; flex-wrap:wrap;}
+  .legend .item{display:flex; align-items:center; gap:6px;}
+  .swatch{width:11px; height:11px; display:inline-block; flex:none;}
+  .swatch.navy{background:var(--navy);}
+  .swatch.black{background:var(--nero);}
+  .swatch.dot{border-radius:50%; background:var(--nero); width:6px; height:6px;}
+  .filterbar .righthint{margin-left:auto; font-size:12px; color:var(--nero); opacity:.8; white-space:nowrap;}
+
+  /* ---------- SEARCH / KEYWORD SELECT (nella banda filtri) ---------- */
+  .search-wrap{position:relative; display:flex; align-items:center;}
+  .search-input{
+    border:2px solid var(--nero); border-radius:999px; background:var(--bianco);
+    padding:6px 14px; font-size:13px; font-family:inherit; color:var(--nero); width:180px;
+  }
+  .search-input::placeholder{color:var(--grigio);}
+  .search-input:focus-visible{outline:3px solid var(--magenta); outline-offset:2px;}
+  /* Filtro diretto per parola chiave: un menu nativo (non pill) perché le parole chiave sono
+     troppe (~20) per stare come bottoni nella barra senza affollarla; si combina in AND con
+     categoria e ricerca testuale, esattamente come nodeMatchesFilter le combina tutte e tre. */
+  .kw-select{
+    border:2px solid var(--nero); border-radius:999px; background:var(--bianco);
+    padding:6px 30px 6px 14px; font-size:13px; font-family:inherit; color:var(--nero);
+    max-width:180px; appearance:none; -webkit-appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23000' d='M4 6l4 4 4-4z'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 10px center; background-size:11px;
+  }
+  .kw-select:focus-visible{outline:3px solid var(--magenta); outline-offset:2px;}
+  .kw-select[data-active="true"]{background-color:var(--nero); color:var(--lime); border-color:var(--nero);
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23bbd052' d='M4 6l4 4 4-4z'/%3E%3C/svg%3E");}
+
+  /* ---------- MAIN LAYOUT ---------- */
+  main.board{
+    display:grid; grid-template-columns:minmax(0,1fr) 30px minmax(0,1fr); min-height:60vh;
+  }
+  .country-col{padding:18px 18px 40px;}
+  .country-head{
+    text-align:center; font-size:13px; font-weight:700; letter-spacing:.12em;
+    padding-bottom:10px; margin-bottom:14px; border-bottom:2px solid var(--nero);
+  }
+  /* la colonna è un asse del tempo a densità (vedi buildColumn/yFor): stessa scala per
+     IT/ES/spina, ma non lineare — restringe i vuoti, si allarga dove gli eventi sono fitti.
+     Altezza reale impostata via JS; card e bande sono posizionate in absolute al suo interno. */
+  .col-body{position:relative;}
+
+  .spine{position:relative;}
+  .spine-line{position:absolute; top:0; bottom:0; left:50%; width:2px; background:var(--nero); opacity:.35; transform:translateX(-50%);}
+  .spine-tick{position:absolute; left:50%; transform:translate(-50%,-50%); display:flex; align-items:center; gap:0; pointer-events:none;}
+  .spine-tick .dot{width:6px; height:6px; border-radius:50%; background:var(--nero); flex:none;}
+  .spine-tick .yr{
+    position:absolute; left:50%; transform:translateX(-50%); top:9px;
+    font-size:9.5px; font-weight:700; color:var(--grigio); white-space:nowrap; background:var(--bianco);
+    padding:0 3px; font-variant-numeric:tabular-nums;
+  }
+
+  /* Le card sono posizionate in absolute (top calcolato in JS sulla scala a densità: stessa
+     scala per tutta la timeline e per entrambe le colonne, ma non lineare — vedi yFor). */
+  .node-card{
+    position:absolute; left:0; top:0;
+    border:2px solid var(--nero); border-radius:999px; background:var(--bianco);
+    padding:5px 13px; margin:0; text-align:left; width:fit-content; max-width:min(230px, 100%);
+    display:flex; align-items:center; gap:6px; font-family:inherit; z-index:1;
+  }
+  .node-card:hover{filter:brightness(.96);}
+  .node-card:focus-visible{outline:3px solid var(--magenta); outline-offset:2px;}
+  .node-card .card-icons{display:flex; gap:3px; flex:none; color:var(--nero);}
+  .node-card .card-icons svg{width:12px; height:12px;}
+  .node-card .t{font-size:12px; font-weight:600; line-height:1.3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .node-card.is-hidden{display:none;}
+
+  /* colonna Italia: le etichette si allineano alla linea centrale, quindi a destra */
+  #col-IT .node-card{left:auto; right:0;}
+
+  /* cornice ovale per categoria (etichette dei singoli eventi): solo contorno, niente sfondo colorato */
+  .node-card.cat-diritti{border-color:var(--diritti-border);}
+  .node-card.cat-movimenti{border-color:var(--movimenti-border);}
+  .node-card.cat-arte{border-color:var(--arte-border);}
+  .node-card.cat-multi{
+    border-color:transparent;
+    background-image:linear-gradient(var(--bianco),var(--bianco)),
+      linear-gradient(120deg, var(--cat-color-a, var(--nero)), var(--cat-color-b, var(--nero)));
+    background-origin:border-box;
+    background-clip:padding-box, border-box;
+  }
+
+  /* Le bande di regime sono rettangoli di sfondo dietro le card, alti quanto la loro
+     durata reale sulla scala proporzionale (mai più corte del loro span storico). */
+  .regime-band{
+    position:absolute; left:0; right:0; top:0;
+    border-radius:10px; padding:12px; color:var(--bianco); z-index:0; box-sizing:border-box;
+  }
+  .regime-band.navy{background:var(--navy);}
+  .regime-band.black{background:var(--nero);}
+  .regime-head{
+    position:absolute; left:0; right:0; top:0; z-index:2;
+    text-align:left; background:transparent; border:none; color:var(--bianco);
+    font-family:inherit; padding:12px; box-sizing:border-box; cursor:pointer;
+  }
+  .regime-head:focus-visible{outline:3px solid var(--magenta); outline-offset:2px;}
+  .regime-head .rt{font-size:12.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;}
+  .regime-head .ry{font-size:11px; opacity:.85; margin-top:2px;}
+  .regime-band .empty-msg{color:rgba(255,255,255,.75); padding:0;}
+
+  .empty-msg{font-size:13px; color:var(--grigio); font-style:italic; padding:8px 0;}
+
+  /* ---------- FOOTER ---------- */
+  footer.footbar{
+    background:var(--lime); border-top:var(--border);
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 20px; font-size:12px; font-weight:600; letter-spacing:.06em; flex-wrap:wrap; gap:8px;
+  }
+  .langs{display:flex; gap:6px;}
+  .langs .pill{padding:3px 10px; font-size:11px;}
+  .footer-credits{display:flex; flex-direction:column; gap:2px;}
+  .footer-credits .fc-line2{font-weight:500; letter-spacing:0; font-size:11px; opacity:.8;}
+
+  /* ---------- DETAIL PANEL ---------- */
+  .scrim{
+    position:fixed; inset:0; background:rgba(0,0,0,.35); opacity:0; pointer-events:none;
+    transition:opacity .18s; z-index:40;
+  }
+  .scrim.open{opacity:1; pointer-events:auto;}
+  .panel{
+    position:fixed; top:0; right:0; height:100%; width:min(440px, 100%);
+    background:var(--bianco); border-left:var(--border);
+    transform:translateX(100%); transition:transform .2s ease; z-index:41;
+    display:flex; flex-direction:column; overflow-y:auto;
+  }
+  .panel.open{transform:translateX(0);}
+  .panel-head{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:14px 18px; border-bottom:2px solid var(--nero); position:sticky; top:0; background:var(--bianco);
+  }
+  .panel-head .crumb{font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; display:inline-flex; align-items:center; gap:6px;}
+  .crumb-icons{display:inline-flex; gap:4px; flex:none;}
+  .crumb-icons svg{width:14px; height:14px;}
+  .panel-head button{background:none; border:none; font-size:20px; line-height:1; padding:4px;}
+  .panel-body{padding:18px; flex:1;}
+  .panel-body h2{font-size:22px; font-family:'Lexend'; font-weight:700; line-height:1.25; margin-bottom:6px; text-wrap:balance;}
+  .panel-body .aka{font-size:12px; color:var(--grigio); margin-bottom:14px;}
+  .panel-body p.desc{font-size:14.5px; margin-bottom:16px; white-space:pre-line;}
+  .panel-img{width:100%; border:2px solid var(--nero); border-radius:8px; overflow:hidden; margin-bottom:6px; background:#f4f4f0;}
+  .panel-img img{width:100%; display:block;}
+  .panel-img[hidden], .img-caption[hidden]{display:none;}
+  .img-caption{font-size:10.5px; color:var(--grigio); text-transform:uppercase; letter-spacing:.05em; margin-bottom:18px;}
+  .img-caption a{color:var(--grigio); text-decoration:underline;}
+  .kw-label{font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--grigio); margin-bottom:8px;}
+  .kw-row{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:18px;}
+  .kw{
+    border:2px solid var(--magenta); color:var(--magenta); border-radius:999px;
+    padding:3px 12px; font-size:12px; font-weight:600;
+    background:none; font-family:inherit; cursor:pointer; transition:background .12s, color .12s;
+  }
+  .kw:hover{background:var(--magenta); color:var(--bianco);}
+  .panel-links{border-top:1px solid #ddd; padding-top:14px; margin-bottom:10px;}
+  .panel-links .plink{
+    display:flex; align-items:flex-start; gap:8px; color:var(--magenta); font-weight:600; font-size:13.5px;
+    margin-bottom:10px; text-decoration:none;
+  }
+  .panel-links a.plink{text-decoration:underline;}
+  .panel-links span.plink{color:var(--grigio); font-weight:500; text-decoration:none;}
+  .panel-links .plink svg{width:15px; height:15px; flex:none; margin-top:1.5px;}
+  .panel-refs{border-top:1px solid #ddd; padding-top:14px; margin-bottom:10px;}
+  .panel-refs .ref-label{font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--grigio); margin-bottom:10px;}
+  .panel-refs .ref{
+    display:flex; align-items:flex-start; gap:8px; font-size:12.5px; color:var(--nero);
+    margin-bottom:10px; line-height:1.4;
+  }
+  .panel-refs .ref svg{width:15px; height:15px; flex:none; margin-top:1px; color:var(--navy);}
+  .panel-refs .ref a{color:var(--magenta); text-decoration:underline;}
+  .panel-nav{
+    display:grid; grid-template-columns:1fr auto 1fr; border-top:2px solid var(--nero);
+    font-size:12px; font-weight:600;
+  }
+  .panel-nav button{background:none; border:none; padding:12px 10px; text-align:left;}
+  .panel-nav button:last-child{text-align:right;}
+  .panel-nav button:disabled{opacity:.3; cursor:default;}
+  .panel-nav .swapcountry{text-align:center; border-left:1px solid #ddd; border-right:1px solid #ddd;}
+  .kbdhint{font-size:11px; color:var(--grigio); text-align:center; padding:8px 0 16px;}
+
+  /* ---------- PAGINA PAROLA CHIAVE ---------- */
+  .kw-panel-intro{font-size:12.5px; color:var(--grigio); margin-bottom:18px;}
+  .kw-group{margin-bottom:20px;}
+  .kw-group:last-child{margin-bottom:0;}
+  .kw-group-label{
+    font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--grigio); margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid #ddd;
+  }
+  .kw-entry{
+    display:flex; align-items:center; gap:10px; width:100%; text-align:left;
+    background:none; border:none; border-radius:8px; padding:8px 8px;
+    font-family:inherit; cursor:pointer; transition:background .12s;
+  }
+  .kw-entry:hover{background:#f4f4f0;}
+  .kw-entry .ke-icons{display:flex; gap:3px; flex:none; color:var(--nero);}
+  .kw-entry .ke-icons svg{width:13px; height:13px;}
+  .kw-entry .ke-year{
+    flex:none; font-size:11px; font-weight:700; color:var(--grigio);
+    font-variant-numeric:tabular-nums; width:38px;
+  }
+  .kw-entry .ke-title{font-size:13.5px; font-weight:600; line-height:1.3;}
+  .kw-entry.cat-diritti{border-left:3px solid var(--diritti-border);}
+  .kw-entry.cat-movimenti{border-left:3px solid var(--movimenti-border);}
+  .kw-entry.cat-arte{border-left:3px solid var(--arte-border);}
+  .kw-entry.cat-multi{border-left:3px solid var(--nero);}
+  .kw-panel-empty{font-size:13px; color:var(--grigio); padding:12px 0;}
+
+  @media (max-width:820px){
+    /* le due colonne IT/ES restano sempre affiancate: il confronto è il punto della timeline */
+    main.board{grid-template-columns:minmax(0,1fr) 24px minmax(0,1fr);}
+    .country-col{padding:12px 8px 32px;}
+    .country-head{font-size:11px; padding-bottom:8px; margin-bottom:10px;}
+    .node-card{padding:4px 10px; gap:5px; max-width:min(190px, 100%);}
+    .node-card .t{font-size:11px; line-height:1.28;}
+    .node-card .card-icons svg{width:11px; height:11px;}
+    .regime-band{padding:9px; border-radius:8px;}
+    .regime-head{padding:9px;}
+    .regime-head .rt{font-size:10.5px;}
+    .regime-head .ry{font-size:9.5px;}
+    .spine-tick .yr{font-size:8.5px; padding:0 2px;}
+    .filterbar .righthint{display:none;}
+    .search-input{width:120px;}
+    .kw-select{max-width:130px;}
+    .panel{width:100%; top:auto; bottom:0; height:auto; max-height:88vh; border-left:none; border-top:var(--border);
+      transform:translateY(100%); border-radius:14px 14px 0 0;}
+    .panel.open{transform:translateY(0);}
+  }
+  @media (max-width:400px){
+    .country-col{padding:10px 5px 28px;}
+    .node-card{padding:4px 9px; max-width:min(150px, 100%);}
+    .node-card .t{font-size:10.5px;}
+    .search-input{width:88px; padding:6px 10px;}
+    .kw-select{max-width:96px; padding:6px 24px 6px 10px; background-position:right 6px center;}
+    .spine-tick .yr{font-size:7.5px; top:8px;}
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand upper">VISUAL ATLAS <span class="sep">/</span> TIMELINE</div>
+  <div class="langs" id="langSwitcherTop">
+    <button class="pill" data-lang="it" aria-pressed="true">IT</button>
+    <button class="pill" data-lang="es" aria-pressed="false">ES</button>
+    <button class="pill" data-lang="en" aria-pressed="false">EN</button>
+  </div>
+</header>
+
+<div class="filterbar">
+  <div class="filterbar-row">
+    <div class="pills" id="filterPills" role="group" aria-label="Filtra per categoria">
+      <button class="pill" data-cat="diritti" aria-pressed="false"><span class="pico"></span><span class="plabel">diritti</span></button>
+      <button class="pill" data-cat="movimenti" aria-pressed="false"><span class="pico"></span><span class="plabel">movimenti</span></button>
+      <button class="pill" data-cat="arte" aria-pressed="false"><span class="pico"></span><span class="plabel">arte</span></button>
+      <button class="pill" data-cat="tutti" aria-pressed="true"><span class="plabel">tutti</span></button>
+    </div>
+    <select class="kw-select" id="keywordSelect" aria-label="Filtra per parola chiave">
+      <option value="">tutte le parole chiave</option>
+    </select>
+    <div class="search-wrap">
+      <input type="search" id="searchInput" class="search-input" placeholder="Cerca nel testo…" aria-label="Cerca nel testo dei nodi">
+    </div>
+    <div class="righthint upper" id="rangeHint">↑↓ nodo · ← → paese · Enter apre</div>
+  </div>
+  <div class="legend">
+    <span class="item"><span class="swatch black"></span><span id="legendDittatura">DITTATURA</span></span>
+    <span class="item"><span class="swatch navy"></span><span id="legendGuerra">GUERRA CIVILE</span></span>
+    <span class="item"><span class="swatch dot"></span><span id="legendNodo">NODO</span></span>
+  </div>
+</div>
+
+<main class="board" id="board" aria-live="polite">
+  <section class="country-col" id="col-IT">
+    <div class="country-head">ITALIA</div>
+    <div class="col-body" id="body-IT"></div>
+  </section>
+  <div class="spine" id="spine" aria-hidden="true"><div class="spine-line"></div></div>
+  <section class="country-col" id="col-ES">
+    <div class="country-head">ESPAÑA</div>
+    <div class="col-body" id="body-ES"></div>
+  </section>
+</main>
+
+<footer class="footbar">
+  <div class="footer-credits">
+    <span id="footerCreditsLine1">Opera di Cristina Iurissevich</span>
+    <span class="fc-line2" id="footerCreditsLine2">Sviluppato nell'ambito del progetto di ricerca dottorale presso l'Accademia di Belle Arti di Catania (2024/2027)</span>
+  </div>
+  <div class="langs" id="langSwitcher">
+    <button class="pill" data-lang="it" aria-pressed="true">IT</button>
+    <button class="pill" data-lang="es" aria-pressed="false">ES</button>
+    <button class="pill" data-lang="en" aria-pressed="false">EN</button>
+  </div>
+</footer>
+
+<div class="scrim" id="scrim"></div>
+<aside class="panel" id="panel" aria-hidden="true">
+  <div class="panel-head">
+    <span class="crumb" id="pCrumb"></span>
+    <button id="pClose" aria-label="Chiudi">✕</button>
+  </div>
+  <div class="panel-body" id="pBody">
+    <h2 id="pTitle"></h2>
+    <div class="aka" id="pAka" hidden></div>
+    <p class="desc" id="pDesc"></p>
+    <div class="panel-img" id="pImgWrap"></div>
+    <div class="img-caption" id="pImgCap"></div>
+    <div class="kw-label" id="pKwLabel" hidden>Keywords</div>
+    <div class="kw-row" id="pKw"></div>
+    <div class="panel-links" id="pLinks"></div>
+    <div class="panel-refs" id="pRefsWrap" hidden>
+      <div class="ref-label" id="pRefLabel">Riferimenti accademici</div>
+      <div id="pRefs"></div>
+    </div>
+  </div>
+  <div class="panel-nav">
+    <button id="pPrev">← nodo prec.</button>
+    <button class="swapcountry" id="pSwap"></button>
+    <button id="pNext">succ. →</button>
+  </div>
+  <div class="kbdhint" id="pKbdHint">ESC chiude · Tab scorre i link del pannello</div>
+</aside>
+
+<aside class="panel" id="kwPanel" aria-hidden="true">
+  <div class="panel-head">
+    <span class="crumb" id="kwCrumb">PAROLA CHIAVE</span>
+    <button id="kwClose" aria-label="Chiudi">✕</button>
+  </div>
+  <div class="panel-body" id="kwBody">
+    <h2 id="kwTitle"></h2>
+    <div class="kw-panel-intro" id="kwIntro"></div>
+    <div id="kwList"></div>
+  </div>
+  <div class="kbdhint" id="kwKbdHint">ESC chiude · clicca una voce per aprirla</div>
+</aside>
+
+<script src="data.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------- ICONE (SVG inline, monocrome, currentColor) ---------------- */
+  var ICONS = {
+    diritti: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M5 7h14M5 7l-3 6a3.5 3.5 0 0 0 6 0zM19 7l-3 6a3.5 3.5 0 0 0 6 0zM9 21h6"/></svg>',
+    movimenti: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9v6h3l5 4V5L6 9H3z"/></svg>',
+    arte: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.5 0 2-.9 2-2 0-.6-.3-1-.6-1.4-.3-.4-.5-.8-.5-1.3 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4c0-4.4-4-7.5-9-7.5z"/><circle cx="7.5" cy="10.5" r="1" fill="currentColor" stroke="none"/><circle cx="9.5" cy="7" r="1" fill="currentColor" stroke="none"/><circle cx="14" cy="6.5" r="1" fill="currentColor" stroke="none"/><circle cx="17" cy="9.5" r="1" fill="currentColor" stroke="none"/></svg>',
+    collettivi: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9.5" r="2.3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M15.3 14.7c2.3.4 4 2.4 4 5.3"/></svg>',
+    esposizioni: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="1"/><path d="M3 15l5-5 4 4 3-3 6 6"/><circle cx="8" cy="9" r="1.4" fill="currentColor" stroke="none"/></svg>',
+    link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3h7v7"/><path d="M10 14L21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>',
+    academic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5"/><path d="M22 9v6"/></svg>'
+  };
+
+  // Sulle etichette dei nodi mostriamo solo le icone di categoria (diritti/movimenti/arte);
+  // l'icona di sottocategoria (collettivi/esposizioni) si vede solo dentro la scheda di dettaglio.
+  function catIconsHtml(node){
+    return node.cat.map(function(c){ return ICONS[c] || ""; }).join("");
+  }
+
+  // Nella scheda di dettaglio: icone di categoria, con l'icona di sottocategoria
+  // (collettivi/esposizioni) accostata a quella di "arte".
+  function panelIconsHtml(node){
+    return node.cat.map(function(c){
+      var ic = ICONS[c] || "";
+      if (c === "arte" && node.subcat && ICONS[node.subcat]) ic += ICONS[node.subcat];
+      return ic;
+    }).join("");
+  }
+
+  var CAT_BORDER_VAR = { diritti: "var(--diritti-border)", movimenti: "var(--movimenti-border)", arte: "var(--arte-border)" };
+
+  function catClass(node){
+    return node.cat.length > 1 ? "cat-multi" : "cat-" + node.cat[0];
+  }
+
+  // Popola le icone nei pill dei filtri (diritti/movimenti/arte)
+  document.querySelectorAll("#filterPills .pill[data-cat]").forEach(function(p){
+    var ico = ICONS[p.dataset.cat];
+    if (ico){
+      var span = p.querySelector(".pico");
+      if (span) span.innerHTML = ico;
+    }
+  });
+
+  var state = { cat: "tutti", flatList: [], currentId: null, query: "", keywordFilter: "", lang: "it" };
+
+  /* ---------------- I18N (IT / EN / ES) ----------------
+     Testi statici dell'interfaccia (non i contenuti dei nodi, che vivono in NODES/REGIMES
+     tramite il campo i18n aggiunto in data.js). Il campo "it" di ciascuna voce coincide col
+     testo già presente via default nell'HTML/JS, mantenuto qui per completezza e coerenza. */
+  var UI = {
+    it: {
+      pillDiritti: "diritti", pillMovimenti: "movimenti", pillArte: "arte", pillTutti: "tutti",
+      filterPillsAria: "Filtra per categoria",
+      keywordSelectAria: "Filtra per parola chiave",
+      keywordSelectAll: "tutte le parole chiave",
+      searchPlaceholder: "Cerca nel testo…",
+      searchAria: "Cerca nel testo dei nodi",
+      rangeHint: "↑↓ nodo · ← → paese · Enter apre",
+      legendDittatura: "DITTATURA", legendGuerra: "GUERRA CIVILE", legendNodo: "NODO",
+      footerCreditsLine1: "Opera di Cristina Iurissevich",
+      footerCreditsLine2: "Sviluppato nell'ambito del progetto di ricerca dottorale presso l'Accademia di Belle Arti di Catania (2024/2027)",
+      closeAria: "Chiudi",
+      kwLabel: "Parole chiave",
+      refLabel: "Riferimenti accademici",
+      prevNode: "← nodo prec.", nextNode: "succ. →",
+      kbdHintPanel: "ESC chiude · Tab scorre i link del pannello",
+      kwCrumb: "PAROLA CHIAVE",
+      kbdHintKwPanel: "ESC chiude · clicca una voce per aprirla",
+      emptyCategoryPeriod: "Nessun nodo di questa categoria in questo periodo.",
+      emptyCategory: "Nessun nodo in questa categoria.",
+      emptyKeyword: "Nessun'altra voce condivide questa parola chiave.",
+      sourceLink: "fonte",
+      kwTagTitle: "Vedi tutte le voci con questa parola chiave",
+      contesto: "CONTESTO",
+      kwIntroOne: " voce collegata a questa parola chiave.",
+      kwIntroMany: " voci collegate a questa parola chiave."
+    },
+    en: {
+      pillDiritti: "rights", pillMovimenti: "movements", pillArte: "art", pillTutti: "all",
+      filterPillsAria: "Filter by category",
+      keywordSelectAria: "Filter by keyword",
+      keywordSelectAll: "all keywords",
+      searchPlaceholder: "Search in text…",
+      searchAria: "Search in node text",
+      rangeHint: "↑↓ node · ← → country · Enter opens",
+      legendDittatura: "DICTATORSHIP", legendGuerra: "CIVIL WAR", legendNodo: "EVENT",
+      footerCreditsLine1: "A work by Cristina Iurissevich",
+      footerCreditsLine2: "Developed as part of a doctoral research project at the Academy of Fine Arts of Catania (2024/2027)",
+      closeAria: "Close",
+      kwLabel: "Keywords",
+      refLabel: "Academic references",
+      prevNode: "← prev. node", nextNode: "next →",
+      kbdHintPanel: "ESC closes · Tab cycles through the panel's links",
+      kwCrumb: "KEYWORD",
+      kbdHintKwPanel: "ESC closes · click an entry to open it",
+      emptyCategoryPeriod: "No entries in this category for this period.",
+      emptyCategory: "No entries in this category.",
+      emptyKeyword: "No other entry shares this keyword.",
+      sourceLink: "source",
+      kwTagTitle: "See all entries with this keyword",
+      contesto: "CONTEXT",
+      kwIntroOne: " entry linked to this keyword.",
+      kwIntroMany: " entries linked to this keyword."
+    },
+    es: {
+      pillDiritti: "derechos", pillMovimenti: "movimientos", pillArte: "arte", pillTutti: "todos",
+      filterPillsAria: "Filtrar por categoría",
+      keywordSelectAria: "Filtrar por palabra clave",
+      keywordSelectAll: "todas las palabras clave",
+      searchPlaceholder: "Buscar en el texto…",
+      searchAria: "Buscar en el texto de los nodos",
+      rangeHint: "↑↓ nodo · ← → país · Enter abre",
+      legendDittatura: "DICTADURA", legendGuerra: "GUERRA CIVIL", legendNodo: "EVENTO",
+      footerCreditsLine1: "Obra de Cristina Iurissevich",
+      footerCreditsLine2: "Desarrollado en el marco de un proyecto de investigación doctoral en la Academia de Bellas Artes de Catania (2024/2027)",
+      closeAria: "Cerrar",
+      kwLabel: "Palabras clave",
+      refLabel: "Referencias académicas",
+      prevNode: "← nodo ant.", nextNode: "sig. →",
+      kbdHintPanel: "ESC cierra · Tab recorre los enlaces del panel",
+      kwCrumb: "PALABRA CLAVE",
+      kbdHintKwPanel: "ESC cierra · clic en una entrada para abrirla",
+      emptyCategoryPeriod: "Ningún nodo de esta categoría en este período.",
+      emptyCategory: "Ningún nodo en esta categoría.",
+      emptyKeyword: "Ninguna otra entrada comparte esta palabra clave.",
+      sourceLink: "fuente",
+      kwTagTitle: "Ver todas las entradas con esta palabra clave",
+      contesto: "CONTEXTO",
+      kwIntroOne: " entrada vinculada a esta palabra clave.",
+      kwIntroMany: " entradas vinculadas a esta palabra clave."
+    }
+  };
+  function t(key){ return UI[state.lang][key]; }
+
+  // Etichette di categoria/sottocategoria (usate nel "crumb" della scheda di dettaglio, es.
+  // "MOVIMENTI + ARTE"): node.cat/subcat restano chiavi interne fisse in tutte le lingue
+  // (servono anche da filtro), solo l'etichetta visualizzata cambia con state.lang.
+  var CAT_LABELS = {
+    it: { diritti: "DIRITTI", movimenti: "MOVIMENTI", arte: "ARTE", collettivi: "COLLETTIVI", esposizioni: "ESPOSIZIONI" },
+    en: { diritti: "RIGHTS", movimenti: "MOVEMENTS", arte: "ART", collettivi: "COLLECTIVES", esposizioni: "EXHIBITIONS" },
+    es: { diritti: "DERECHOS", movimenti: "MOVIMIENTOS", arte: "ARTE", collettivi: "COLECTIVOS", esposizioni: "EXPOSICIONES" }
+  };
+
+  // I nomi dei due paesi restano sempre nella loro forma nativa (ITALIA/ESPAÑA) in tutte
+  // e tre le lingue dell'interfaccia: è una scelta editoriale coerente con l'impostazione
+  // originale del progetto (già in italiano si usava "ESPAÑA" e non "Spagna").
+  function countryLabel(cc){ return cc === "IT" ? "ITALIA" : "ESPAÑA"; }
+
+  function nodeSearchText(node){
+    if (!node._searchText){
+      node._searchText = [node.title, node.fullTitle, node.desc].concat(node.keywords || [], node.refs || [])
+        .join(" ").toLowerCase();
+    }
+    return node._searchText;
+  }
+
+  function nodeMatchesFilter(node){
+    if (state.cat !== "tutti" && node.cat.indexOf(state.cat) === -1) return false;
+    if (state.keywordFilter && (!node.keywords || node.keywords.indexOf(state.keywordFilter) === -1)) return false;
+    if (state.query && nodeSearchText(node).indexOf(state.query) === -1) return false;
+    return true;
+  }
+
+  function regimesFor(country){
+    return REGIMES.filter(function(r){ return r.country === country; })
+      .sort(function(a,b){ return a.start - b.start; });
+  }
+
+  function nodeInRegime(node, regime){
+    return node.year >= regime.start && node.year <= regime.end;
+  }
+
+  // Distanza minima verticale tra due elementi consecutivi nella stessa colonna
+  // (evita che due eventi vicini nel tempo si sovrappongano visivamente).
+  var CARD_GAP = 8;
+
+  // Regressione isotonica (Pool Adjacent Violators Algorithm): dato un array di valori,
+  // restituisce la sequenza non-decrescente più vicina possibile (minimi quadrati). È il
+  // cuore dell'anti-collisione a scala proporzionale: a differenza di un cursore "avido" che
+  // spinge ogni elemento sempre più in basso senza mai poter tornare indietro (causa di
+  // derive permanenti quando un periodo è molto denso), la PAVA trova il compromesso
+  // ottimale, lasciando esattamente al loro posto gli elementi lontani da ogni affollamento.
+  function isotonicRegression(values){
+    var stack = [];
+    for (var i = 0; i < values.length; i++){
+      var cur = { value: values[i], weight: 1, count: 1 };
+      stack.push(cur);
+      while (stack.length > 1 && stack[stack.length - 2].value > stack[stack.length - 1].value){
+        var b = stack.pop();
+        var a = stack.pop();
+        var mergedWeight = a.weight + b.weight;
+        var mergedValue = (a.value * a.weight + b.value * b.weight) / mergedWeight;
+        stack.push({ value: mergedValue, weight: mergedWeight, count: a.count + b.count });
+      }
+    }
+    var result = [];
+    stack.forEach(function(block){
+      for (var k = 0; k < block.count; k++) result.push(block.value);
+    });
+    return result;
+  }
+
+  // Applica la PAVA a una sequenza di elementi già ordinati cronologicamente, ciascuno con
+  // una posizione "ideale" (yFor(anno)) e un ingombro verticale minimo (size + gap prima del
+  // successivo). Restituisce le posizioni finali: mai sovrapposte, mai prima della propria
+  // posizione ideale nel complesso della colonna, e il più possibile fedeli alla scala reale.
+  function declutter(seq){
+    var n = seq.length;
+    var requiredOffset = new Array(n);
+    var acc = 0;
+    for (var i = 0; i < n; i++){
+      requiredOffset[i] = acc;
+      acc += seq[i].size + seq[i].gap;
+    }
+    var reduced = seq.map(function(it, i){ return it.ideal - requiredOffset[i]; });
+    var q = isotonicRegression(reduced);
+    seq.forEach(function(it, i){ it.top = q[i] + requiredOffset[i]; });
+  }
+
+  // Timeline a scala a densità (vedi yFor): identica per IT ed ES — è quello che rende le due
+  // colonne davvero confrontabili come in un vero strumento di visual analytics — ma non
+  // lineare: i periodi vuoti sono già ristretti dalla scala stessa. Dove più eventi cadono
+  // comunque troppo vicini per stare senza sovrapporsi, la regressione isotonica (vedi
+  // declutter/isotonicRegression sopra) li ridistribuisce nel modo più fedele possibile alla
+  // scala: gli elementi isolati restano esattamente alla loro quota corretta, solo i cluster
+  // densi vengono ulteriormente allargati quel tanto che basta, senza propagare la deriva al
+  // resto della colonna.
+  function buildColumn(country){
+    var el = document.getElementById("body-" + country);
+    el.innerHTML = "";
+
+    var nodes = NODES.filter(function(n){ return n.country === country; })
+      .sort(function(a,b){ return a.year - b.year; });
+    var regimes = regimesFor(country);
+    var visibleAny = false;
+
+    // Sequenza unica cronologica: intestazioni di regime (che riservano il loro spazio come
+    // qualsiasi altro elemento) + i nodi visibili col filtro corrente. A parità di anno,
+    // l'intestazione di un regime precede i propri eventi.
+    var items = [];
+    regimes.forEach(function(reg){
+      items.push({ type: "head", reg: reg, year: reg.start });
+    });
+    nodes.forEach(function(node){
+      var match = nodeMatchesFilter(node);
+      if (match) visibleAny = true;
+      if (match) items.push({ type: "card", node: node, year: node.year });
+    });
+    // Ordinamento cronologico con criteri di priorità agli anni di confine tra regimi
+    // consecutivi (es. Guerra Civile termina nel 1939, Franchismo inizia nel 1939): la
+    // chiusura di un regime deve sempre precedere l'apertura del successivo, altrimenti la
+    // PAVA potrebbe tirare l'intestazione del nuovo regime sopra alla fine reale del vecchio.
+    function itemCmp(a, b){
+      if (a.year !== b.year) return a.year - b.year;
+      if (a.type === "tail" && b.type === "head" && a.reg !== b.reg) return -1;
+      if (b.type === "tail" && a.type === "head" && b.reg !== a.reg) return 1;
+      if (a.type === "head" && b.type === "tail" && a.reg === b.reg) return -1;
+      if (b.type === "head" && a.type === "tail" && b.reg === a.reg) return 1;
+      if (a.type === "card" && b.type === "tail" && nodeInRegime(a.node, b.reg)) return -1;
+      if (b.type === "card" && a.type === "tail" && nodeInRegime(b.node, a.reg)) return 1;
+      if (a.type === "tail" && b.type === "card") return -1;
+      if (b.type === "tail" && a.type === "card") return 1;
+      if (a.type === "head" && b.type === "card" && nodeInRegime(b.node, a.reg)) return -1;
+      if (b.type === "head" && a.type === "card" && nodeInRegime(a.node, b.reg)) return 1;
+      return 0;
+    }
+    items.sort(itemCmp);
+
+    // Pass 1: crea gli elementi DOM (non ancora posizionati) e misurane l'altezza naturale.
+    items.forEach(function(it){
+      if (it.type === "head"){
+        var reg = it.reg;
+        var head = document.createElement("button");
+        head.className = "regime-head";
+        head.dataset.year = String(reg.start);
+        head.innerHTML = '<div class="rt">' + reg.label + '</div><div class="ry">' + reg.start + '–' + reg.end + '</div>';
+        head.addEventListener("click", function(r){
+          return function(){ openRegimePanel(r); };
+        }(reg));
+        it.el = head;
+      } else {
+        var node = it.node;
+        var card = document.createElement("button");
+        card.className = "node-card " + catClass(node);
+        card.dataset.id = node._id;
+        card.dataset.year = String(node.year);
+        card.title = node.title;
+        if (node.cat.length > 1){
+          card.style.setProperty("--cat-color-a", CAT_BORDER_VAR[node.cat[0]] || "var(--nero)");
+          card.style.setProperty("--cat-color-b", CAT_BORDER_VAR[node.cat[1]] || "var(--nero)");
+        }
+        card.innerHTML = '<span class="card-icons">' + catIconsHtml(node) + '</span><span class="t">' + escapeHtml(node.title) + '</span>';
+        card.addEventListener("click", function(id){ return function(){ openPanel(id); }; }(node._id));
+        it.el = card;
+      }
+    });
+    items.forEach(function(it){ el.appendChild(it.el); });
+    items.forEach(function(it){ it.h = it.el.getBoundingClientRect().height; });
+    items.forEach(function(it){ el.removeChild(it.el); });
+
+    // Pass 2: posizione proporzionale (yFor) con anti-collisione via regressione isotonica
+    // (PAVA). Aggiungiamo anche un elemento "coda" invisibile per ogni regime, ancorato al
+    // suo anno di fine: partecipa all'ordinamento e all'anti-collisione esattamente come una
+    // card, ma non occupa spazio proprio (size 0) e non viene mai disegnato — serve solo a
+    // impedire che il regime successivo collassi sopra alla fine reale di quello precedente.
+    var tails = regimes.map(function(reg){
+      return { type: "tail", reg: reg, year: reg.end, h: 0 };
+    });
+    var declSeq = items.concat(tails).sort(itemCmp);
+    declSeq.forEach(function(it){
+      it.ideal = yFor(it.year);
+      it.size = it.h;
+      it.gap = (it.type === "card") ? CARD_GAP : 0;
+    });
+    declutter(declSeq);
+    var maxBottom = 0;
+    declSeq.forEach(function(it){ maxBottom = Math.max(maxBottom, it.top + it.size); });
+
+    // Pass 3: bande di regime come rettangoli di sfondo, alte almeno quanto la loro durata reale.
+    var bandsFrag = document.createDocumentFragment();
+    regimes.forEach(function(reg){
+      var headItem = items.filter(function(it){ return it.type === "head" && it.reg === reg; })[0];
+      var memberCards = items.filter(function(it){ return it.type === "card" && nodeInRegime(it.node, reg); });
+      var top = headItem.top;
+      var bottom = Math.max(yFor(reg.end), top + headItem.h);
+      memberCards.forEach(function(c){ bottom = Math.max(bottom, c.top + c.h); });
+
+      var band = document.createElement("div");
+      band.className = "regime-band " + reg.tone;
+      band.style.top = top + "px";
+      band.style.height = (bottom - top) + "px";
+      band.style.paddingTop = (headItem.h + 8) + "px";
+      if (!memberCards.length){
+        var bmsg = document.createElement("div");
+        bmsg.className = "empty-msg";
+        bmsg.textContent = t("emptyCategoryPeriod");
+        band.appendChild(bmsg);
+      }
+      bandsFrag.appendChild(band);
+      maxBottom = Math.max(maxBottom, bottom);
+    });
+    el.appendChild(bandsFrag);
+
+    // Pass 4: posiziona (absolute) intestazioni e card sopra alle bande.
+    items.forEach(function(it){
+      it.el.style.top = it.top + "px";
+      el.appendChild(it.el);
+    });
+
+    // La colonna arriva sempre almeno fino all'ultimo checkpoint (di norma la tacca del 2020,
+    // vedi YEAR_MAX), più un margine di respiro prima del footer — anche quando l'ultimo nodo
+    // reale è più in alto, così la spina non finisce mai "a metà" né a ridosso del footer.
+    maxBottom = Math.max(maxBottom, yFor(YEAR_MAX));
+    el.style.height = (maxBottom + BOTTOM_BREATHING_SPACE) + "px";
+
+    if (!visibleAny && !regimes.length){
+      var msg = document.createElement("div");
+      msg.className = "empty-msg";
+      msg.textContent = t("emptyCategory");
+      el.appendChild(msg);
+    }
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+
+  // Trasforma eventuali URL presenti in un testo (es. dentro una citazione accademica)
+  // in link cliccabili, mantenendo il resto come testo semplice.
+  function linkify(text){
+    var escaped = escapeHtml(text);
+    return escaped.replace(/(https?:\/\/[^\s<]+)/g, function(url){
+      var clean = url.replace(/[.,;)\]]+$/, "");
+      var trail = url.slice(clean.length);
+      return '<a href="' + clean + '" target="_blank" rel="noopener">' + clean + '</a>' + trail;
+    });
+  }
+
+  /* ---------------- SCALA A DENSITÀ (visual analytics, non lineare) ---------------- */
+  // Stessa scala del tempo, identica per IT, ES e per la spina — questo è ciò che rende le
+  // durate e le distanze temporali davvero confrontabili a colpo d'occhio, ed è irrinunciabile.
+  // Ma non è una scala lineare: i periodi senza eventi vengono ristretti (ogni intervallo
+  // vuoto costa al massimo MAX_PX_PER_STEP pixel, qualunque sia la sua durata reale), mentre i
+  // periodi densi si allargano naturalmente, perché ogni anno "di interesse" vicino ad altri
+  // ottiene comunque almeno MIN_PX_PER_STEP pixel: tanti anni ravvicinati si sommano.
+  // A differenza della versione precedente, i checkpoint "evento" ora dipendono dal filtro
+  // attivo (vedi computeScale/nodeMatchesFilter): quando un tratto di tempo non contiene più
+  // nessun nodo visibile (es. filtro "movimenti" su un decennio senza eventi di movimento), quel
+  // tratto si restringe fino al minimo garantito dalle sole tacche/regimi, invece di restare
+  // "gonfiato" dagli eventi di categorie nascoste. Regimi e tacche ogni 20 anni restano invece
+  // sempre presenti, qualunque sia il filtro: sono i punti di riferimento fissi della spina.
+  var BASE_PX_PER_YEAR = 2.2;
+  var MIN_PX_PER_STEP = 45;
+  var MAX_PX_PER_STEP = 70;
+  // Spazio (in px) lasciato dopo l'ultimo checkpoint (di norma la tacca dell'ultimo ventennio)
+  // prima che la colonna finisca e inizi il footer: dà respiro visivo ed evita che l'ultima
+  // tacca della spina sembri "attaccata" al footer.
+  var BOTTOM_BREATHING_SPACE = 44;
+
+  var YEAR_MIN = (function(){
+    var years = NODES.map(function(n){ return n.year; }).concat(
+      REGIMES.map(function(r){ return r.start; })
+    );
+    return Math.min.apply(null, years);
+  })();
+  // L'estremo superiore della scala è sempre almeno il 2020 (arrotondato al ventennio), anche se
+  // l'ultimo evento del dataset è precedente: così la spina arriva sempre a una tacca "tonda" di
+  // chiusura invece di fermarsi a metà, qualunque sia l'anno dell'ultimo nodo.
+  var YEAR_MAX = Math.max((function(){
+    var years = NODES.map(function(n){ return n.year; }).concat(
+      REGIMES.map(function(r){ return r.end; })
+    );
+    return Math.max.apply(null, years);
+  })(), 2020);
+
+  /* ---------------- SPINE (linea centrale con annualità chiave) ---------------- */
+  // Tacche ogni 20 anni: fanno parte anch'esse dei "checkpoint" della scala (vedi sotto), così
+  // restano sempre coerenti con le card e le bande, qualunque sia il filtro attivo.
+  var KEY_YEARS = (function(){
+    var start = Math.ceil(YEAR_MIN / 20) * 20;
+    var out = [];
+    for (var y = start; y <= YEAR_MAX; y += 20) out.push(y);
+    return out;
+  })();
+
+  // Checkpoint: ogni anno "di interesse" (evento VISIBILE col filtro corrente, inizio/fine
+  // regime, tacca della spina), deduplicato e ordinato. La distanza in pixel tra due checkpoint
+  // consecutivi dipende dalla distanza in anni ma è sempre compresa tra MIN_PX_PER_STEP e
+  // MAX_PX_PER_STEP: è questo che restringe i vuoti e — insieme all'anti-collisione in
+  // buildColumn — allarga i pieni. Va ricalcolata a ogni cambio di filtro/ricerca (vedi
+  // rebuild()), altrimenti i tratti senza eventi visibili non si restringerebbero mai.
+  var CHECKPOINTS = [];
+  var CHECKPOINT_POS = [];
+
+  function computeScale(){
+    var years = NODES.filter(nodeMatchesFilter).map(function(n){ return n.year; })
+      .concat(REGIMES.map(function(r){ return r.start; }))
+      .concat(REGIMES.map(function(r){ return r.end; }))
+      .concat(KEY_YEARS)
+      .concat([YEAR_MIN, YEAR_MAX]);
+    years = years.filter(function(y, i){ return years.indexOf(y) === i; });
+    years.sort(function(a, b){ return a - b; });
+    CHECKPOINTS = years;
+
+    var pos = [0];
+    for (var i = 1; i < CHECKPOINTS.length; i++){
+      var gapYears = CHECKPOINTS[i] - CHECKPOINTS[i - 1];
+      var gapPx = Math.min(MAX_PX_PER_STEP, Math.max(MIN_PX_PER_STEP, gapYears * BASE_PX_PER_YEAR));
+      pos.push(pos[i - 1] + gapPx);
+    }
+    CHECKPOINT_POS = pos;
+  }
+
+  // yFor: posizione in pixel di un anno qualunque sulla scala a densità (corrente, cioè
+  // ricalcolata sull'ultimo filtro applicato). Se l'anno coincide con un checkpoint restituisce
+  // la sua posizione esatta; altrimenti interpola linearmente tra i due checkpoint più vicini
+  // (capita solo per anni che non sono né eventi né tacche).
+  function yFor(year){
+    if (year <= CHECKPOINTS[0]) return CHECKPOINT_POS[0];
+    if (year >= CHECKPOINTS[CHECKPOINTS.length - 1]) return CHECKPOINT_POS[CHECKPOINT_POS.length - 1];
+    var lo = 0, hi = CHECKPOINTS.length - 1;
+    while (hi - lo > 1){
+      var mid = (lo + hi) >> 1;
+      if (CHECKPOINTS[mid] <= year) lo = mid; else hi = mid;
+    }
+    var y0 = CHECKPOINTS[lo], y1 = CHECKPOINTS[hi];
+    var p0 = CHECKPOINT_POS[lo], p1 = CHECKPOINT_POS[hi];
+    var t = (y1 === y0) ? 0 : (year - y0) / (y1 - y0);
+    return p0 + t * (p1 - p0);
+  }
+
+  function renderSpine(){
+    var spine = document.getElementById("spine");
+    var itHead = document.querySelector("#col-IT .country-head");
+    var itBody = document.getElementById("body-IT");
+    if (!spine || !itHead || !itBody) return;
+    spine.querySelectorAll(".spine-tick").forEach(function(t){ t.remove(); });
+
+    // Le colonne hanno un'intestazione ("ITALIA"/"ESPAÑA") sopra al proprio asse degli anni;
+    // la spina no, quindi la misuriamo per allineare esattamente anno 0 delle card con anno 0
+    // delle tacche (stessa intestazione, stessa altezza, in entrambe le colonne).
+    var headOffset = itBody.getBoundingClientRect().top - itHead.getBoundingClientRect().top;
+
+    KEY_YEARS.forEach(function(y){
+      var tick = document.createElement("div");
+      tick.className = "spine-tick";
+      tick.style.top = (yFor(y) + headOffset) + "px";
+      tick.innerHTML = '<span class="dot"></span><span class="yr">' + y + '</span>';
+      spine.appendChild(tick);
+    });
+  }
+
+  function rebuild(){
+    computeScale();
+    buildColumn("IT");
+    buildColumn("ES");
+    updateFilterVisualState();
+    renderSpine();
+  }
+
+  function updateFilterVisualState(){
+    document.querySelectorAll("#filterPills .pill").forEach(function(p){
+      p.setAttribute("aria-pressed", p.dataset.cat === state.cat ? "true" : "false");
+    });
+    keywordSelect.setAttribute("data-active", state.keywordFilter ? "true" : "false");
+  }
+
+  document.getElementById("filterPills").addEventListener("click", function(e){
+    var btn = e.target.closest(".pill");
+    if (!btn) return;
+    var focusedId = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.id : null;
+    state.cat = btn.dataset.cat;
+    rebuild();
+    // filtro applicato via tastiera: riporta il focus sui filtri stessi, non su un nodo ora nascosto
+    if (!focusedId) btn.focus();
+  });
+
+  var searchInput = document.getElementById("searchInput");
+  var searchDebounce = null;
+  searchInput.addEventListener("input", function(){
+    clearTimeout(searchDebounce);
+    var val = searchInput.value;
+    searchDebounce = setTimeout(function(){
+      state.query = val.trim().toLowerCase();
+      rebuild();
+    }, 120);
+  });
+
+  // Filtro diretto per parola chiave: menu popolato dinamicamente da tutte le parole chiave
+  // realmente presenti nel dataset (mai una lista scritta a mano, così resta sempre coerente
+  // anche se in futuro cambiano i dati), con il conteggio delle voci accanto a ciascuna, ordinate
+  // alfabeticamente. Si combina in AND con categoria e ricerca testuale (vedi nodeMatchesFilter).
+  var keywordSelect = document.getElementById("keywordSelect");
+  function populateKeywordSelect(){
+    var prevValue = keywordSelect.value;
+    var counts = {};
+    NODES.forEach(function(n){
+      (n.keywords || []).forEach(function(k){ counts[k] = (counts[k] || 0) + 1; });
+    });
+    keywordSelect.innerHTML = "";
+    var allOpt = document.createElement("option");
+    allOpt.value = "";
+    allOpt.textContent = t("keywordSelectAll");
+    keywordSelect.appendChild(allOpt);
+    Object.keys(counts).sort(function(a, b){ return a.localeCompare(b, state.lang); }).forEach(function(k){
+      var opt = document.createElement("option");
+      opt.value = k;
+      opt.textContent = k + " (" + counts[k] + ")";
+      keywordSelect.appendChild(opt);
+    });
+    // dopo un cambio lingua state.keywordFilter è già stato azzerato altrove; qui ripristiniamo
+    // solo la selezione se il valore precedente esiste ancora tra le nuove opzioni (stessa lingua)
+    if (prevValue && counts[prevValue] !== undefined) keywordSelect.value = prevValue;
+  }
+  populateKeywordSelect();
+  keywordSelect.addEventListener("change", function(){
+    state.keywordFilter = keywordSelect.value;
+    rebuild();
+  });
+
+  /* ---------------- DETAIL PANEL ---------------- */
+  var scrim = document.getElementById("scrim");
+  var panel = document.getElementById("panel");
+  var kwPanel = document.getElementById("kwPanel");
+
+  function renderSources(container, sources){
+    container.innerHTML = "";
+    (sources || []).forEach(function(s){
+      if (s.url){
+        var a = document.createElement("a");
+        a.className = "plink";
+        a.href = s.url; a.target = "_blank"; a.rel = "noopener";
+        a.innerHTML = ICONS.link + '<span>' + escapeHtml(s.label || s.url) + '</span>';
+        container.appendChild(a);
+      } else {
+        var sp = document.createElement("span");
+        sp.className = "plink";
+        sp.innerHTML = ICONS.link + '<span>' + escapeHtml(s.label) + '</span>';
+        container.appendChild(sp);
+      }
+    });
+  }
+
+  function renderRefs(wrap, listEl, refs){
+    listEl.innerHTML = "";
+    if (!refs || !refs.length){ wrap.hidden = true; return; }
+    wrap.hidden = false;
+    refs.forEach(function(r){
+      var row = document.createElement("div");
+      row.className = "ref";
+      row.innerHTML = ICONS.academic + '<span>' + linkify(r) + '</span>';
+      listEl.appendChild(row);
+    });
+  }
+
+  function catLabel(node){
+    var labels = CAT_LABELS[state.lang];
+    var parts = node.cat.map(function(c){ return labels[c] || c.toUpperCase(); });
+    if (node.subcat) parts.push(labels[node.subcat] || node.subcat.toUpperCase());
+    return parts.join(" + ");
+  }
+
+  function openPanel(id, opts){
+    opts = opts || {};
+    var node = NODES.find(function(n){ return n._id === id; });
+    if (!node) return;
+
+    closeKwPanel();
+
+    state.currentId = id;
+    if (!opts.skipHash) history.replaceState(null, "", "#" + id);
+
+    document.getElementById("pCrumb").innerHTML =
+      '<span class="crumb-icons">' + panelIconsHtml(node) + '</span>' +
+      escapeHtml(countryLabel(node.country) + " · " + (node.yearDisplay || node.year) + " · " + catLabel(node));
+    document.getElementById("pTitle").textContent = node.fullTitle || node.title;
+    var akaEl = document.getElementById("pAka");
+    if (node.fullTitle && node.fullTitle !== node.title){
+      akaEl.hidden = false;
+      akaEl.textContent = node.title;
+    } else {
+      akaEl.hidden = true;
+    }
+    document.getElementById("pDesc").textContent = node.desc;
+
+    var imgWrap = document.getElementById("pImgWrap");
+    var imgCap = document.getElementById("pImgCap");
+    if (node.img){
+      imgWrap.hidden = false;
+      imgCap.hidden = false;
+      imgWrap.innerHTML = '<img src="' + node.img.url + '" alt="' + escapeHtml(node.title) + '" loading="lazy">';
+      imgCap.innerHTML = escapeHtml(node.img.credit) + (node.img.creditUrl ? ' — <a href="' + node.img.creditUrl + '" target="_blank" rel="noopener">' + t("sourceLink") + '</a>' : "");
+    } else {
+      // nessuna immagine per questo nodo: niente placeholder, il blocco sparisce del tutto
+      imgWrap.hidden = true;
+      imgCap.hidden = true;
+      imgWrap.innerHTML = "";
+      imgCap.textContent = "";
+    }
+
+    var kwRow = document.getElementById("pKw");
+    var kwLabel = document.getElementById("pKwLabel");
+    kwRow.innerHTML = "";
+    if (node.keywords && node.keywords.length){
+      kwLabel.hidden = false;
+      node.keywords.forEach(function(k){
+        var s = document.createElement("button");
+        s.type = "button";
+        s.className = "kw";
+        s.textContent = k;
+        s.title = t("kwTagTitle");
+        s.addEventListener("click", function(){ openKeywordPanel(k); });
+        kwRow.appendChild(s);
+      });
+    } else {
+      kwLabel.hidden = true;
+    }
+
+    renderSources(document.getElementById("pLinks"), node.sources);
+    renderRefs(document.getElementById("pRefsWrap"), document.getElementById("pRefs"), node.refs);
+
+    var prevBtn = document.getElementById("pPrev");
+    var nextBtn = document.getElementById("pNext");
+    var kbdHint = document.getElementById("pKbdHint");
+
+    // prev/next within ordered flat list (regardless of filter, so navigation always works)
+    var list = NODES.slice().sort(function(a,b){
+      if (a.year !== b.year) return a.year - b.year;
+      return a.country.localeCompare(b.country);
+    });
+    var idx = list.findIndex(function(n){ return n._id === id; });
+    prevBtn.disabled = idx <= 0;
+    nextBtn.disabled = idx >= list.length - 1;
+    prevBtn.onclick = function(){ if (idx > 0) openPanel(list[idx-1]._id); };
+    nextBtn.onclick = function(){ if (idx < list.length -1) openPanel(list[idx+1]._id); };
+    kbdHint.textContent = t("kbdHintPanel");
+
+    // same-year, other-country swap
+    var otherCountry = node.country === "IT" ? "ES" : "IT";
+    var sameYearOther = NODES.filter(function(n){ return n.country === otherCountry && n.year === node.year; });
+    var swapBtn = document.getElementById("pSwap");
+    if (sameYearOther.length){
+      swapBtn.textContent = countryLabel(otherCountry) + " " + node.year + " ⇄";
+      swapBtn.disabled = false;
+      swapBtn.onclick = function(){ openPanel(sameYearOther[0]._id); };
+    } else {
+      swapBtn.textContent = String(node.year);
+      swapBtn.disabled = true;
+    }
+
+    scrim.classList.add("open");
+    panel.classList.add("open");
+    panel.setAttribute("aria-hidden", "false");
+  }
+
+  function openRegimePanel(regime){
+    closeKwPanel();
+    document.getElementById("pKbdHint").textContent = t("kbdHintPanel");
+    history.replaceState(null, "", "#regime-" + regime.country + "-" + regime.start);
+
+    document.getElementById("pCrumb").textContent =
+      countryLabel(regime.country) + " · " + regime.start + "–" + regime.end + " · " + t("contesto");
+    document.getElementById("pTitle").textContent = regime.label.charAt(0) + regime.label.slice(1).toLowerCase();
+    document.getElementById("pAka").hidden = true;
+    document.getElementById("pDesc").textContent = regime.note;
+    var rImgWrap = document.getElementById("pImgWrap");
+    var rImgCap = document.getElementById("pImgCap");
+    rImgWrap.hidden = true; rImgWrap.innerHTML = "";
+    rImgCap.hidden = true; rImgCap.textContent = "";
+    document.getElementById("pKw").innerHTML = "";
+    document.getElementById("pKwLabel").hidden = true;
+    renderSources(document.getElementById("pLinks"), regime.source ? [regime.source] : []);
+    renderRefs(document.getElementById("pRefsWrap"), document.getElementById("pRefs"), []);
+    document.getElementById("pPrev").disabled = true;
+    document.getElementById("pNext").disabled = true;
+    var swapBtn = document.getElementById("pSwap");
+    swapBtn.textContent = regime.start + "–" + regime.end;
+    swapBtn.disabled = true;
+    state.currentId = null;
+
+    scrim.classList.add("open");
+    panel.classList.add("open");
+    panel.setAttribute("aria-hidden", "false");
+  }
+
+  function closePanel(){
+    scrim.classList.remove("open");
+    panel.classList.remove("open");
+    panel.setAttribute("aria-hidden", "true");
+    if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+  }
+
+  function closeKwPanel(){
+    scrim.classList.remove("open");
+    kwPanel.classList.remove("open");
+    kwPanel.setAttribute("aria-hidden", "true");
+  }
+
+  function closeAnyPanel(){
+    if (kwPanel.classList.contains("open")) closeKwPanel();
+    else closePanel();
+  }
+
+  /* ---------------- PAGINA PAROLA CHIAVE ----------------
+     Ogni parola chiave nella scheda di un nodo è cliccabile: apre una pagina che elenca
+     tutte le voci (di qualunque paese/categoria) che condividono quella stessa parola
+     chiave, ciascuna a sua volta cliccabile per aprirne la scheda di dettaglio. */
+  function openKeywordPanel(keyword){
+    closePanel();
+
+    history.replaceState(null, "", "#keyword-" + encodeURIComponent(keyword));
+
+    document.getElementById("kwTitle").textContent = keyword;
+    var matches = NODES.filter(function(n){ return n.keywords && n.keywords.indexOf(keyword) !== -1; })
+      .sort(function(a, b){
+        if (a.year !== b.year) return a.year - b.year;
+        return a.country.localeCompare(b.country);
+      });
+    document.getElementById("kwIntro").textContent =
+      matches.length + (matches.length === 1 ? t("kwIntroOne") : t("kwIntroMany"));
+
+    var listEl = document.getElementById("kwList");
+    listEl.innerHTML = "";
+    if (!matches.length){
+      var empty = document.createElement("div");
+      empty.className = "kw-panel-empty";
+      empty.textContent = t("emptyKeyword");
+      listEl.appendChild(empty);
+    } else {
+      var groups = { IT: [], ES: [] };
+      matches.forEach(function(n){ groups[n.country].push(n); });
+      ["IT", "ES"].forEach(function(cc){
+        if (!groups[cc].length) return;
+        var group = document.createElement("div");
+        group.className = "kw-group";
+        var label = document.createElement("div");
+        label.className = "kw-group-label";
+        label.textContent = countryLabel(cc) + " · " + groups[cc].length;
+        group.appendChild(label);
+        groups[cc].forEach(function(n){
+          var entry = document.createElement("button");
+          entry.type = "button";
+          entry.className = "kw-entry " + catClass(n);
+          entry.innerHTML =
+            '<span class="ke-icons">' + catIconsHtml(n) + '</span>' +
+            '<span class="ke-year">' + (n.yearDisplay || n.year) + '</span>' +
+            '<span class="ke-title">' + escapeHtml(n.title) + '</span>';
+          entry.addEventListener("click", function(){ openPanel(n._id); });
+          group.appendChild(entry);
+        });
+        listEl.appendChild(group);
+      });
+    }
+
+    scrim.classList.add("open");
+    kwPanel.classList.add("open");
+    kwPanel.setAttribute("aria-hidden", "false");
+  }
+
+  document.getElementById("pClose").addEventListener("click", closePanel);
+  document.getElementById("kwClose").addEventListener("click", closeKwPanel);
+  scrim.addEventListener("click", closeAnyPanel);
+  document.addEventListener("keydown", function(e){
+    if (e.key === "Escape") closeAnyPanel();
+  });
+
+  /* ---------------- KEYBOARD NAVIGATION (desktop) ---------------- */
+  // ↑↓ scorre i nodi (e le testate di regime) dentro la stessa colonna paese;
+  // ← → salta al nodo più vicino per anno nell'altra colonna, per confrontare.
+  function navItemsFor(country){
+    var col = document.getElementById("body-" + country);
+    if (!col) return [];
+    return Array.prototype.slice.call(
+      col.querySelectorAll(".node-card:not(.is-hidden), .regime-head")
+    );
+  }
+
+  function closestByYear(items, year){
+    if (!items.length) return null;
+    var best = items[0];
+    var bestDiff = Math.abs(Number(best.dataset.year) - year);
+    for (var i = 1; i < items.length; i++){
+      var diff = Math.abs(Number(items[i].dataset.year) - year);
+      if (diff < bestDiff){ best = items[i]; bestDiff = diff; }
+    }
+    return best;
+  }
+
+  document.addEventListener("keydown", function(e){
+    var el = document.activeElement;
+    if (!el || !el.classList || !(el.classList.contains("node-card") || el.classList.contains("regime-head"))) return;
+    var col = el.closest(".country-col");
+    if (!col) return;
+    var country = col.id === "col-IT" ? "IT" : "ES";
+
+    if (e.key === "ArrowDown" || e.key === "ArrowUp"){
+      e.preventDefault();
+      var items = navItemsFor(country);
+      var idx = items.indexOf(el);
+      if (idx === -1) return;
+      var nextIdx = e.key === "ArrowDown" ? idx + 1 : idx - 1;
+      if (nextIdx >= 0 && nextIdx < items.length){
+        items[nextIdx].focus();
+        items[nextIdx].scrollIntoView({ block: "nearest" });
+      }
+    } else if (e.key === "ArrowRight" && country === "IT"){
+      e.preventDefault();
+      var toES = closestByYear(navItemsFor("ES"), Number(el.dataset.year));
+      if (toES){ toES.focus(); toES.scrollIntoView({ block: "nearest" }); }
+    } else if (e.key === "ArrowLeft" && country === "ES"){
+      e.preventDefault();
+      var toIT = closestByYear(navItemsFor("IT"), Number(el.dataset.year));
+      if (toIT){ toIT.focus(); toIT.scrollIntoView({ block: "nearest" }); }
+    }
+  });
+
+  /* ---------------- RESPONSIVITÀ SPINA ---------------- */
+  var spineResizeTimer = null;
+  window.addEventListener("resize", function(){
+    clearTimeout(spineResizeTimer);
+    spineResizeTimer = setTimeout(renderSpine, 150);
+  });
+  if (document.fonts && document.fonts.ready){
+    document.fonts.ready.then(function(){ renderSpine(); });
+  }
+
+  /* ---------------- PERMALINK: apertura da hash + back/forward ---------------- */
+  function openFromHash(){
+    var hash = location.hash.replace(/^#/, "");
+    if (!hash) return;
+    if (hash.indexOf("regime-") === 0){
+      var rest = hash.slice(7); // "IT-1922" ecc.
+      var rCountry = rest.split("-")[0];
+      var rStart = Number(rest.split("-")[1]);
+      var regime = REGIMES.find(function(r){ return r.country === rCountry && r.start === rStart; });
+      if (regime) openRegimePanel(regime);
+      return;
+    }
+    if (hash.indexOf("keyword-") === 0){
+      var kw = decodeURIComponent(hash.slice(8));
+      openKeywordPanel(kw);
+      return;
+    }
+    var node = NODES.find(function(n){ return n._id === hash; });
+    if (node){
+      openPanel(hash, { skipHash: true });
+      var card = document.querySelector('.node-card[data-id="' + hash + '"]');
+      if (card) setTimeout(function(){ card.scrollIntoView({ block: "center" }); }, 60);
+    }
+  }
+
+  window.addEventListener("popstate", function(){
+    if (location.hash) openFromHash();
+    else closeAnyPanel();
+  });
+
+  /* ---------------- CAMBIO LINGUA (IT / EN / ES) ----------------
+     I contenuti dei nodi/regimi vivono in NODES/REGIMES con i campi in italiano più un
+     campo i18n = { en: {...}, es: {...} } (aggiunto in data.js). Cambiare lingua non
+     ricostruisce il DOM da zero: sovrascrive semplicemente i campi "attivi" di ciascun
+     nodo/regime (title/fullTitle/desc/keywords, label/note) con la versione nella lingua
+     scelta — così tutto il codice di rendering esistente (che legge node.title, node.desc,
+     ecc.) continua a funzionare invariato, in qualunque lingua. */
+  function updateRangeHint(){
+    var years = NODES.map(function(n){ return n.year; });
+    var min = Math.min.apply(null, years), max = Math.max.apply(null, years);
+    document.getElementById("rangeHint").textContent = min + " → " + max + " · " + t("rangeHint");
+  }
+
+  function applyUIStrings(){
+    document.querySelector('.pill[data-cat="diritti"] .plabel').textContent = t("pillDiritti");
+    document.querySelector('.pill[data-cat="movimenti"] .plabel').textContent = t("pillMovimenti");
+    document.querySelector('.pill[data-cat="arte"] .plabel').textContent = t("pillArte");
+    document.querySelector('.pill[data-cat="tutti"] .plabel').textContent = t("pillTutti");
+    document.getElementById("filterPills").setAttribute("aria-label", t("filterPillsAria"));
+    keywordSelect.setAttribute("aria-label", t("keywordSelectAria"));
+    searchInput.setAttribute("placeholder", t("searchPlaceholder"));
+    searchInput.setAttribute("aria-label", t("searchAria"));
+    document.getElementById("legendDittatura").textContent = t("legendDittatura");
+    document.getElementById("legendGuerra").textContent = t("legendGuerra");
+    document.getElementById("legendNodo").textContent = t("legendNodo");
+    document.getElementById("footerCreditsLine1").textContent = t("footerCreditsLine1");
+    document.getElementById("footerCreditsLine2").textContent = t("footerCreditsLine2");
+    document.getElementById("pClose").setAttribute("aria-label", t("closeAria"));
+    document.getElementById("kwClose").setAttribute("aria-label", t("closeAria"));
+    document.getElementById("pKwLabel").textContent = t("kwLabel");
+    document.getElementById("pRefLabel").textContent = t("refLabel");
+    document.getElementById("pPrev").textContent = t("prevNode");
+    document.getElementById("pNext").textContent = t("nextNode");
+    document.getElementById("pKbdHint").textContent = t("kbdHintPanel");
+    document.getElementById("kwCrumb").textContent = t("kwCrumb");
+    document.getElementById("kwKbdHint").textContent = t("kbdHintKwPanel");
+    populateKeywordSelect();
+    updateRangeHint();
+    document.documentElement.lang = state.lang;
+  }
+
+  function applyLanguage(lang){
+    if (!UI[lang] || state.lang === lang) return;
+    state.lang = lang;
+
+    NODES.forEach(function(n){
+      if (!n._base) n._base = { title: n.title, fullTitle: n.fullTitle, desc: n.desc, keywords: n.keywords };
+      var src = (lang === "it") ? n._base : ((n.i18n && n.i18n[lang]) || n._base);
+      n.title = src.title;
+      n.fullTitle = src.fullTitle;
+      n.desc = src.desc;
+      n.keywords = src.keywords;
+      n._searchText = null; // forza il ricalcolo della cache di ricerca nella nuova lingua
+    });
+    REGIMES.forEach(function(r){
+      if (!r._base) r._base = { label: r.label, note: r.note };
+      var src = (lang === "it") ? r._base : ((r.i18n && r.i18n[lang]) || r._base);
+      r.label = src.label;
+      r.note = src.note;
+    });
+
+    // Il filtro parola chiave e la ricerca testuale non hanno equivalenti affidabili tra
+    // lingue diverse (i valori sono testo in chiaro): si azzerano al cambio lingua.
+    state.keywordFilter = "";
+    state.query = "";
+    searchInput.value = "";
+
+    document.querySelectorAll(".langs .pill").forEach(function(b){
+      b.setAttribute("aria-pressed", b.dataset.lang === lang ? "true" : "false");
+    });
+
+    closeAnyPanel();
+    applyUIStrings();
+    rebuild();
+  }
+
+  document.querySelectorAll(".langs .pill").forEach(function(btn){
+    btn.addEventListener("click", function(){ applyLanguage(btn.dataset.lang); });
+  });
+
+  /* ---------------- INIT ---------------- */
+  NODES.forEach(function(n){ n._id = n.country + "-" + n.row; });
+
+  updateRangeHint();
+  rebuild();
+  openFromHash();
+
+})();
+</script>
+</body>
+</html>
